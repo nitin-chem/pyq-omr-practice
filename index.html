@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PYQ OMR — Floating Answer Sheet</title>
+<style>
+:root { color-scheme: light; --navy:#193653; --blue:#2563eb; --line:#dbe3ed; --bg:#f4f7fb; --green:#15803d; --red:#b91c1c; }
+* { box-sizing:border-box; }
+body { margin:0; font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; color:#172033; background:var(--bg); }
+header { background:var(--navy); color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+header h1 { font-size:16px; margin:0; letter-spacing:.3px; }
+header small { opacity:.85; display:block; margin-top:2px; }
+main { padding:14px; max-width:760px; margin:auto; }
+.panel { background:white; border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; box-shadow:0 2px 7px #1720330a; }
+label { display:block; font-weight:600; margin-bottom:6px; }
+input,select,button { font:inherit; }
+input[type=number],input[type=text],select { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 10px; background:white; }
+button { border:1px solid #cbd5e1; border-radius:8px; background:white; padding:9px 12px; cursor:pointer; font-weight:600; }
+button:hover { background:#eef4fb; }
+button.primary { color:white; background:var(--blue); border-color:var(--blue); }
+button.primary:hover { background:#1d4ed8; }
+button:disabled { opacity:.4; cursor:not-allowed; }
+.row { display:flex; align-items:center; gap:8px; }
+.row > * { flex:1; min-width:0; }
+.topline { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:10px; }
+.muted { color:#64748b; font-size:12px; }
+.progress { height:6px; background:#e2e8f0; border-radius:8px; overflow:hidden; margin:8px 0; }
+.progress > div { height:100%; width:0; background:var(--blue); transition:width .15s; }
+.type-toggle { display:flex; gap:8px; }
+.type-toggle button { flex:1; }
+.type-toggle button.active { background:#dbeafe; border-color:#60a5fa; color:#1d4ed8; }
+.options { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
+.options button { padding:14px 5px; font-size:17px; }
+.options button.chosen { background:#dbeafe; border:2px solid var(--blue); color:#1d4ed8; }
+.nav { display:flex; gap:8px; margin-top:14px; }
+.nav button { flex:1; }
+.grid { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; }
+.grid button { padding:7px 0; font-size:12px; }
+.grid button.done { background:#dcfce7; border-color:#86efac; }
+.grid button.current { outline:2px solid var(--blue); outline-offset:1px; }
+.hidden { display:none !important; }
+.metric-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.metric { background:#f1f5f9; border-radius:9px; padding:12px; }
+.metric b { display:block; font-size:22px; margin-top:3px; }
+table { border-collapse:collapse; width:100%; font-size:12px; }
+th,td { border-bottom:1px solid var(--line); text-align:left; padding:8px 6px; vertical-align:top; overflow-wrap:anywhere; }
+th { background:#f8fafc; position:sticky; top:0; }
+.table-wrap { max-height:320px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+.good { color:var(--green); font-weight:700; }
+.bad { color:var(--red); font-weight:700; }
+.warn { color:#a16207; font-weight:700; }
+footer { text-align:center; color:#64748b; font-size:11px; padding:4px 12px 16px; }
+@media (max-width:460px) {
+ main {padding:9px;} .panel {padding:11px;} .grid {grid-template-columns:repeat(6,minmax(0,1fr));}
+ header h1 {font-size:14px;} .options button {padding:12px 3px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>PYQ OMR</h1><small>Floating-style answer sheet · Your PDF stays separate</small></div>
+  <button id="compactBtn" title="Use a compact window layout">Compact</button>
+</header>
+<main>
+  <section class="panel" id="setup">
+    <h2 style="margin:0 0 8px;font-size:18px">Start practice</h2>
+    <p class="muted">Open your question paper PDF in another window. This page records your answers only; it contains no questions.</p>
+    <label for="count">How many questions will you attempt today?</label>
+    <input id="count" type="number" min="1" max="500" value="50">
+    <button class="primary" id="startBtn" style="width:100%;margin-top:12px">Start practice</button>
+  </section>
+
+  <section class="hidden" id="practice">
+    <div class="panel">
+      <div class="topline"><strong id="qLabel">Question 1 of 50</strong><span id="answerState" class="muted">Not answered</span></div>
+      <div class="progress"><div id="progressBar"></div></div>
+      <div class="muted">Record the answer for this question from your PDF.</div>
+    </div>
+    <div class="panel">
+      <label>Question type</label>
+      <div class="type-toggle">
+        <button id="mcqType" class="active">MCQ</button>
+        <button id="natType">NAT</button>
+      </div>
+      <div id="mcqArea">
+        <div class="options" id="options">
+          <button data-answer="A">A</button><button data-answer="B">B</button>
+          <button data-answer="C">C</button><button data-answer="D">D</button>
+        </div>
+      </div>
+      <div id="natArea" class="hidden" style="margin-top:14px">
+        <label for="natAnswer">Numerical answer</label>
+        <input id="natAnswer" type="text" inputmode="decimal" placeholder="e.g. 2.5, -1, 0.75">
+      </div>
+      <div class="nav">
+        <button id="prevBtn">← Previous</button>
+        <button id="clearBtn">Clear</button>
+        <button class="primary" id="nextBtn">Next →</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="topline"><strong>Question navigator</strong><span class="muted">Green = answer recorded</span></div>
+      <div id="questionGrid" class="grid"></div>
+    </div>
+    <button class="primary" id="finishBtn" style="width:100%;margin-bottom:12px">Finish & enter answer key</button>
+  </section>
+
+  <section class="hidden" id="answerKey">
+    <div class="panel">
+      <h2 style="margin:0 0 6px;font-size:18px">Enter correct answers</h2>
+      <p class="muted">Use the official answer key for your PDF. Select A/B/C/D for MCQs and enter a number for NAT.</p>
+      <label for="tolerance">NAT tolerance</label>
+      <input id="tolerance" type="number" min="0" step="any" value="0.01">
+      <div id="keyFields" style="margin-top:12px"></div>
+      <div class="nav">
+        <button id="backToTestBtn">← Back to test</button>
+        <button class="primary" id="checkBtn">Check results</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="hidden" id="results">
+    <div class="panel">
+      <h2 style="margin:0 0 12px;font-size:19px">Performance analysis</h2>
+      <div class="metric-grid">
+        <div class="metric">Correct<b id="mCorrect">0</b></div>
+        <div class="metric">Incorrect<b id="mIncorrect">0</b></div>
+        <div class="metric">Unanswered<b id="mUnanswered">0</b></div>
+        <div class="metric">Accuracy<b id="mAccuracy">0%</b></div>
+      </div>
+      <p id="overall" style="font-weight:700;margin-bottom:0"></p>
+    </div>
+    <div class="panel">
+      <div class="topline"><strong>Question-by-question review</strong><button id="downloadBtn">Download CSV</button></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Q</th><th>Type</th><th>Your answer</th><th>Correct answer</th><th>Result</th></tr></thead>
+        <tbody id="resultsBody"></tbody>
+      </table></div>
+      <button id="newTestBtn" class="primary" style="width:100%;margin-top:14px">Start a new test</button>
+    </div>
+  </section>
+</main>
+<footer>PYQ OMR · Your answers remain in this browser tab until you close or reset the session.</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let total = 0, current = 0, types = [], answers = [], key = [], finalRows = [];
+let resultReady = false;
+
+function section(id, show) { $(id).classList.toggle("hidden", !show); }
+function saveCurrent() {
+  if (!total || resultReady) return;
+  if (types[current] === "MCQ") {
+    const selected = document.querySelector("#options button.chosen");
+    answers[current] = selected ? selected.dataset.answer : null;
+  } else {
+    const val = $("natAnswer").value.trim();
+    answers[current] = val === "" ? null : val;
+  }
+}
+function render() {
+  if (!total) return;
+  $("qLabel").textContent = `Question ${current+1} of ${total}`;
+  $("progressBar").style.width = `${((current+1)/total)*100}%`;
+  $("answerState").textContent = answers[current] == null ? "Not answered" : "Answer recorded";
+  $("mcqType").classList.toggle("active", types[current] === "MCQ");
+  $("natType").classList.toggle("active", types[current] === "NAT");
+  $("mcqArea").classList.toggle("hidden", types[current] !== "MCQ");
+  $("natArea").classList.toggle("hidden", types[current] !== "NAT");
+  document.querySelectorAll("#options button").forEach(b => {
+    b.classList.toggle("chosen", types[current] === "MCQ" && answers[current] === b.dataset.answer);
+  });
+  $("natAnswer").value = types[current] === "NAT" && answers[current] != null ? answers[current] : "";
+  $("prevBtn").disabled = current === 0;
+  $("nextBtn").disabled = current === total-1;
+  renderGrid();
+}
+function renderGrid() {
+  const grid = $("questionGrid"); grid.innerHTML = "";
+  for (let i=0; i<total; i++) {
+    const b = document.createElement("button");
+    b.textContent = `${i+1}${answers[i] != null ? " ✓" : ""}`;
+    if (answers[i] != null) b.classList.add("done");
+    if (i === current) b.classList.add("current");
+    b.addEventListener("click", () => { saveCurrent(); current=i; render(); });
+    grid.appendChild(b);
+  }
+}
+function setType(type) {
+  saveCurrent();
+  types[current] = type;
+  // Don't carry an MCQ letter into NAT or a NAT value into MCQ.
+  if (type === "MCQ" && !["A","B","C","D"].includes(answers[current])) answers[current] = null;
+  if (type === "NAT" && ["A","B","C","D"].includes(answers[current])) answers[current] = null;
+  render();
+}
+$("startBtn").addEventListener("click", () => {
+  const n = Number($("count").value);
+  if (!Number.isInteger(n) || n < 1 || n > 500) {
+    alert("Enter a whole number between 1 and 500."); return;
+  }
+  total=n; current=0; types=Array(n).fill("MCQ"); answers=Array(n).fill(null); key=Array(n).fill(null); resultReady=false;
+  section("setup",false); section("practice",true); section("answerKey",false); section("results",false);
+  render();
+});
+document.querySelectorAll("#options button").forEach(b => b.addEventListener("click", () => {
+  answers[current]=b.dataset.answer; render();
+}));
+$("natAnswer").addEventListener("input", () => {
+  const val=$("natAnswer").value.trim(); answers[current]=val === "" ? null : val;
+  $("answerState").textContent=val === "" ? "Not answered" : "Answer recorded";
+  renderGrid();
+});
+$("mcqType").addEventListener("click",()=>setType("MCQ"));
+$("natType").addEventListener("click",()=>setType("NAT"));
+$("prevBtn").addEventListener("click",()=>{saveCurrent();if(current>0)current--;render();});
+$("nextBtn").addEventListener("click",()=>{saveCurrent();if(current<total-1)current++;render();});
+$("clearBtn").addEventListener("click",()=>{answers[current]=null;render();});
+$("finishBtn").addEventListener("click",()=>{
+  saveCurrent();
+  const unanswered=answers.filter(x=>x==null).length;
+  if(unanswered && !confirm(`${unanswered} question(s) are unanswered. Continue to the answer key?`)) return;
+  buildKeyForm(); section("practice",false);section("answerKey",true);section("results",false);
+});
+function buildKeyForm() {
+  const host=$("keyFields");host.innerHTML="";
+  for(let i=0;i<total;i++){
+    const wrap=document.createElement("div");wrap.style.cssText="display:grid;grid-template-columns:100px 1fr;gap:10px;align-items:center;margin:8px 0";
+    const label=document.createElement("label");label.textContent=`Q${i+1} (${types[i]})`;label.style.margin="0";
+    let input;
+    if(types[i]==="MCQ"){
+      input=document.createElement("select");
+      ["","A","B","C","D"].forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v||"Select";input.appendChild(o);});
+    } else {
+      input=document.createElement("input");input.type="number";input.step="any";input.placeholder="Correct numerical answer";
+    }
+    input.id=`key_${i}`;input.value=key[i]??"";
+    wrap.append(label,input);host.appendChild(wrap);
+  }
+}
+$("backToTestBtn").addEventListener("click",()=>{section("answerKey",false);section("practice",true);render();});
+$("checkBtn").addEventListener("click",()=>{
+  const tolerance=Number($("tolerance").value);
+  if(!Number.isFinite(tolerance)||tolerance<0){alert("NAT tolerance must be a non-negative number.");return;}
+  const parsed=[];
+  for(let i=0;i<total;i++){
+    const raw=$( `key_${i}` ).value.trim();
+    if(raw===""){alert(`Please enter the correct answer for Question ${i+1}.`);return;}
+    if(types[i]==="MCQ"){
+      if(!["A","B","C","D"].includes(raw)){alert(`Q${i+1}: choose A, B, C or D.`);return;}
+      parsed.push(raw);
+    }else{
+      const num=Number(raw);
+      if(!Number.isFinite(num)){alert(`Q${i+1}: enter a valid numerical answer.`);return;}
+      parsed.push(num);
+    }
+  }
+  key=parsed; resultReady=true; calculate(tolerance);
+});
+function calculate(tolerance) {
+  let correct=0,incorrect=0,unanswered=0;finalRows=[];
+  for(let i=0;i<total;i++){
+    const user=answers[i], expected=key[i];let status;
+    if(user==null){status="Unanswered";unanswered++;}
+    else if(types[i]==="MCQ"){
+      if(user===expected){status="Correct";correct++;}else{status="Incorrect";incorrect++;}
+    }else{
+      const n=Number(user);
+      if(user.trim()!=="" && Number.isFinite(n) && Math.abs(n-expected)<=tolerance){status="Correct";correct++;}
+      else{status="Incorrect";incorrect++;}
+    }
+    finalRows.push({Question:i+1,Type:types[i],"Your answer":user??"","Correct answer":expected,Result:status});
+  }
+  const attempted=total-unanswered, accuracy=attempted?correct/attempted*100:0, overall=correct/total*100;
+  $("mCorrect").textContent=correct;$("mIncorrect").textContent=incorrect;$("mUnanswered").textContent=unanswered;
+  $("mAccuracy").textContent=accuracy.toFixed(2)+"%";
+  $("overall").textContent=`Overall score: ${overall.toFixed(2)}% · ${correct}/${total} correct`;
+  const body=$("resultsBody");body.innerHTML="";
+  finalRows.forEach(r=>{
+    const tr=document.createElement("tr");
+    [r.Question,r.Type,r["Your answer"]||"—",r["Correct answer"],r.Result].forEach((v,j)=>{
+      const td=document.createElement("td");td.textContent=v;
+      if(j===4)td.className=v==="Correct"?"good":v==="Incorrect"?"bad":"warn";
+      tr.appendChild(td);
+    });body.appendChild(tr);
+  });
+  section("answerKey",false);section("results",true);
+}
+$("downloadBtn").addEventListener("click",()=>{
+  const cols=["Question","Type","Your answer","Correct answer","Result"];
+  const csv=[cols,...finalRows.map(r=>cols.map(c=>r[c]))]
+    .map(row=>row.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\r\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="pyq_results.csv";a.click();URL.revokeObjectURL(url);
+});
+$("newTestBtn").addEventListener("click",()=>{
+  if(!confirm("Start a new test? The current session will be cleared."))return;
+  total=0;current=0;types=[];answers=[];key=[];resultReady=false;
+  section("results",false);section("setup",true);
+});
+$("compactBtn").addEventListener("click",()=>{
+  document.body.classList.toggle("compact");
+  const compact=document.body.classList.contains("compact");
+  document.querySelectorAll("main").forEach(el=>el.style.maxWidth=compact?"430px":"760px");
+  $("compactBtn").textContent=compact?"Normal":"Compact";
+});
+</script>
+</body>
+</html>
